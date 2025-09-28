@@ -7,28 +7,33 @@ const DEFAULT_SETTINGS = {
     level: 1,
     experience: 0
 };
+// 3. 经验值常量
+const XP_REWARDS = {
+    CREATE_DAILY_NOTE: 50, // 创建日记奖励
+    COMPLETE_TASK: 50, // 完成任务奖励
+    CANCEL_TASK: 50, // 取消任务扣除
+};
+const LEVEL_SYSTEM = {
+    BASE_XP: 100, // 基础经验需求
+    XP_MULTIPLIER: 1.2, // 经验需求倍率
+    LEVEL_BONUS: 25, // 每级额外经验需求
+};
 class XpPlugin extends obsidian_1.Plugin {
     constructor() {
         super(...arguments);
-        // 内存缓存保持不变
         this.checkboxStateCache = new Map();
     }
     async onload() {
-        console.log("✅ XP 插件 (纯逻辑版) 已加载");
-        // 加载已保存的数据
         await this.loadSettings();
-        // --- 功能1：点击图标增加经验 ---
-        this.addRibbonIcon("dice", "手动增加 10 点经验", async () => {
-            await this.addExperience(10, "手动点击");
-        });
-        // --- 功能2：创建日记时增加经验 ---
+        // --- 功能：创建日记时增加经验 ---
         this.registerEvent(this.app.vault.on('create', async (file) => {
             if (this.isDailyNote(file)) {
                 console.log(`检测到日记创建: ${file.path}`);
-                await this.addExperience(50, "创建日记");
+                await this.addExperience(XP_REWARDS.CREATE_DAILY_NOTE, "创建日记");
+                this.checkboxStateCache.set(file.path, 3);
             }
         }));
-        // --- 功能3：修改日记中的勾选框时改变经验 ---
+        // --- 功能：修改日记中的勾选框时改变经验 ---
         this.registerEvent(this.app.vault.on('modify', async (file) => {
             if (!this.isDailyNote(file))
                 return;
@@ -40,47 +45,44 @@ class XpPlugin extends obsidian_1.Plugin {
                 return;
             }
             if (newCount > oldCount) {
-                await this.addExperience((newCount - oldCount) * 50, "完成任务");
+                await this.addExperience((newCount - oldCount) * XP_REWARDS.COMPLETE_TASK, "完成任务");
             }
             else if (newCount < oldCount) {
-                await this.subtractExperience((oldCount - newCount) * 50, "取消任务");
+                await this.subtractExperience((oldCount - newCount) * XP_REWARDS.CANCEL_TASK, "取消任务");
             }
             this.checkboxStateCache.set(file.path, newCount);
         }));
     }
-    // --- 核心功能函数 (已升级，包含数据保存和升级逻辑) ---
     async addExperience(amount, source) {
         console.log(`来源: ${source}, 经验 +${amount}, 当前等级: ${this.settings.level}, 当前经验: ${this.settings.experience}`);
         this.settings.experience += amount;
-        new obsidian_1.Notice(`🎉 你获得了 ${amount} 点经验！`);
+        new obsidian_1.Notice(`You got ${amount} exp!`);
         this.checkForLevelUp(); // 检查是否升级
         await this.saveSettings(); // 保存数据
     }
     async subtractExperience(amount, source) {
         console.log(`来源: ${source}, 经验 -${amount}, 当前等级: ${this.settings.level}, 当前经验: ${this.settings.experience}`);
         this.settings.experience = Math.max(0, this.settings.experience - amount);
-        new obsidian_1.Notice(`😅 你失去了 ${amount} 点经验！`);
+        new obsidian_1.Notice(`You lost ${amount} exp!`);
         await this.saveSettings(); // 保存数据
     }
-    // 4. 处理升级的逻辑
     checkForLevelUp() {
         const requiredXp = this.getRequiredXpForLevel(this.settings.level);
         while (this.settings.experience >= requiredXp) {
             this.settings.level++;
             this.settings.experience -= requiredXp;
-            new obsidian_1.Notice(`🚀 等级提升！你现在是 ${this.settings.level} 级了！`);
+            new obsidian_1.Notice(`Level Up! Now you are ${this.settings.level} level !`);
         }
     }
-    // 5. 数据加载和保存的函数
     async loadSettings() {
         this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
     }
     async saveSettings() {
         await this.saveData(this.settings);
     }
-    // --- 辅助函数 (Helpers) ---
+    // --- 辅助函数 ---
     getRequiredXpForLevel(level) {
-        return 100 + (level - 1) * 50;
+        return Math.floor(LEVEL_SYSTEM.BASE_XP * Math.pow(LEVEL_SYSTEM.XP_MULTIPLIER, level - 1));
     }
     isDailyNote(file) {
         if (!(file instanceof obsidian_1.TFile) || file.extension !== 'md') {
