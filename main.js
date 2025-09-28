@@ -23,19 +23,21 @@ class XpPlugin extends obsidian_1.Plugin {
     constructor() {
         super(...arguments);
         this.checkboxStateCache = new Map();
+        this.statusBarElement = null;
     }
     async onload() {
         await this.loadSettings();
+        // 初始化状态栏
+        this.initStatusBar();
         // 初始化已存在的日记文件的复选框状态
         await this.initializeExistingDailyNotes();
         // --- 功能：创建日记时增加经验 ---
         this.registerEvent(this.app.vault.on('create', async (file) => {
             if (file instanceof obsidian_1.TFile && this.isDailyNote(file)) {
-                const filePath = file.path;
                 const dailyNoteKey = this.getDailyNoteKey(file);
                 // 检查是否已经记录过这个日记的创建
                 if (!this.settings.createdDailyNotes.includes(dailyNoteKey)) {
-                    console.log(`检测到日记创建: ${filePath}`);
+                    console.log(`检测到日记创建: ${file.path}`);
                     await this.addExperience(XP_REWARDS.CREATE_DAILY_NOTE, "创建日记");
                     // 记录这个日记已经被创建过了
                     this.settings.createdDailyNotes.push(dailyNoteKey);
@@ -75,6 +77,30 @@ class XpPlugin extends obsidian_1.Plugin {
             }
         }
     }
+    // 新增：初始化状态栏
+    initStatusBar() {
+        this.statusBarElement = this.addStatusBarItem();
+        this.statusBarElement.addClass('xp-status-bar');
+        this.updateStatusBar();
+    }
+    // 新增：更新状态栏显示
+    updateStatusBar() {
+        if (!this.statusBarElement)
+            return;
+        const currentLevel = this.settings.level;
+        const currentXp = this.settings.experience;
+        const requiredXp = this.getRequiredXpForLevel(currentLevel);
+        const progress = (currentXp / requiredXp) * 100;
+        this.statusBarElement.innerHTML = `
+            <div class="xp-container">
+                <span class="xp-level">Level ${currentLevel}</span>
+                <div class="xp-progress-bar">
+                    <div class="xp-progress-fill" style="width: ${progress}%"></div>
+                    <span class="xp-progress-text">${currentXp} / ${requiredXp} XP</span>
+                </div>
+            </div>
+        `;
+    }
     // 新增：初始化单个文件的复选框缓存
     async initializeCheckboxCache(file) {
         const content = await this.app.vault.cachedRead(file);
@@ -91,12 +117,14 @@ class XpPlugin extends obsidian_1.Plugin {
         this.settings.experience += amount;
         new obsidian_1.Notice(`You got ${amount} exp!`);
         this.checkForLevelUp(); // 检查是否升级
+        this.updateStatusBar(); // 更新状态栏
         await this.saveSettings(); // 保存数据
     }
     async subtractExperience(amount, source) {
         console.log(`来源: ${source}, 经验 -${amount}, 当前等级: ${this.settings.level}, 当前经验: ${this.settings.experience}`);
         this.settings.experience = Math.max(0, this.settings.experience - amount);
         new obsidian_1.Notice(`You lost ${amount} exp!`);
+        this.updateStatusBar(); // 更新状态栏
         await this.saveSettings(); // 保存数据
     }
     checkForLevelUp() {

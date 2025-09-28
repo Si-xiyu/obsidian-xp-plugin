@@ -37,9 +37,13 @@ interface DailyNoteSettings {
 export default class XpPlugin extends Plugin {
     settings!: XpPluginSettings;
     private checkboxStateCache: Map<string, number> = new Map();
+    private statusBarElement: HTMLElement | null = null;
 
     async onload() {
         await this.loadSettings();
+
+        // 初始化状态栏
+        this.initStatusBar();
 
         // 初始化已存在的日记文件的复选框状态
         await this.initializeExistingDailyNotes();
@@ -48,12 +52,11 @@ export default class XpPlugin extends Plugin {
         this.registerEvent(
             this.app.vault.on('create', async (file) => {
                 if (file instanceof TFile && this.isDailyNote(file)) {
-                    const filePath = file.path;
                     const dailyNoteKey = this.getDailyNoteKey(file);
                     
                     // 检查是否已经记录过这个日记的创建
                     if (!this.settings.createdDailyNotes.includes(dailyNoteKey)) {
-                        console.log(`检测到日记创建: ${filePath}`);
+                        console.log(`检测到日记创建: ${file.path}`);
                         await this.addExperience(XP_REWARDS.CREATE_DAILY_NOTE, "创建日记");
                         
                         // 记录这个日记已经被创建过了
@@ -103,6 +106,32 @@ export default class XpPlugin extends Plugin {
         }
     }
 
+    // 新增：初始化状态栏
+    initStatusBar() {
+        this.statusBarElement = this.addStatusBarItem();
+        this.statusBarElement.addClass('xp-status-bar');
+        this.updateStatusBar();
+    }
+
+    // 新增：更新状态栏显示
+    updateStatusBar() {
+        if (!this.statusBarElement) return;
+
+        const currentLevel = this.settings.level;
+        const currentXp = this.settings.experience;
+        const requiredXp = this.getRequiredXpForLevel(currentLevel);
+        const progress = (currentXp / requiredXp) * 100;
+
+        this.statusBarElement.innerHTML = `
+            <div class="xp-container">
+                <span class="xp-level">Level ${currentLevel}</span>
+                <div class="xp-progress-bar">
+                    <div class="xp-progress-fill" style="width: ${progress}%"></div>
+                    <span class="xp-progress-text">${currentXp} / ${requiredXp} XP</span>
+                </div>
+            </div>
+        `;
+    }
     // 新增：初始化单个文件的复选框缓存
     async initializeCheckboxCache(file: TFile) {
         const content = await this.app.vault.cachedRead(file);
@@ -123,6 +152,7 @@ export default class XpPlugin extends Plugin {
         new Notice(`You got ${amount} exp!`);
         
         this.checkForLevelUp(); // 检查是否升级
+        this.updateStatusBar(); // 更新状态栏
         await this.saveSettings(); // 保存数据
     }
 
@@ -132,6 +162,7 @@ export default class XpPlugin extends Plugin {
 
         new Notice(`You lost ${amount} exp!`);
 
+        this.updateStatusBar(); // 更新状态栏
         await this.saveSettings(); // 保存数据
     }
 
@@ -161,10 +192,12 @@ export default class XpPlugin extends Plugin {
         if (!file || file.extension !== 'md') {
             return false;
         }
+        
         const dailyNoteSettings = this.getDailyNoteSettings();
         const expectedFilename = window.moment().format(dailyNoteSettings.format);
         const expectedFolderPath = normalizePath(dailyNoteSettings.folder);
         const fileFolderPath = file.parent ? normalizePath(file.parent.path) : '';
+        
         return file.basename === expectedFilename && fileFolderPath === expectedFolderPath;
     }
 
