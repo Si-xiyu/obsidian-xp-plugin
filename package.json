@@ -1,18 +1,13 @@
 {
   "name": "obsidian-xp-plugin",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "dist/main.js",
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch"
+    "build": "tsc"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
   "devDependencies": {
-    "@types/node": "^24.5.2",
-    "obsidian": "^1.8.7",
-    "typescript": "^5.9.2"
+    "typescript": "^5.0.0",
+    "@types/node": "^20.0.0",
+    "obsidian": "^1.6.0"
   }
 }

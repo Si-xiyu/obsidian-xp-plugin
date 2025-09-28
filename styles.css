@@ -1,0 +1,6 @@
+/* 给插件一个简单的样式 */
+.xp-progress-bar {
+  height: 10px;
+  background: linear-gradient(to right, #4caf50, #81c784);
+  border-radius: 5px;
+}

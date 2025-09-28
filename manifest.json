@@ -3,7 +3,8 @@
   "name": "XP Progress Bar",
   "version": "1.0.0",
   "minAppVersion": "1.6.0",
-  "description": "显示经验条的 Obsidian 插件",
+  "description": "显示一个经验条的 Obsidian 插件",
   "author": "Si-xiyu",
   "isDesktopOnly": false
 }
+
